@@ -1,11 +1,32 @@
 {
     "name": "cloudcatch/user-roles-table",
-    "description": "A lightweight WordPress plugin that enhances WP_User_Query and get_users() performance by mirroring user roles into a custom database table, reducing overhead and improving scalability for large user bases.",
+    "description": "A WordPress plugin that boosts WP_User_Query performance by adjusting SQL queries to use a custom user roles table, reducing overhead and improving scalability.",
+    "keywords": [
+        "wordpress",
+        "query",
+        "user",
+        "roles",
+        "capabilities",
+        "performance"
+    ],
     "version": "0.0.0-development",
     "require": {
         "php": ">=8.0"
     },
     "license": "GPL-2.0-or-later",
+    "type": "wordpress-plugin",
+    "authors": [
+        {
+            "name": "CloudCatch",
+            "email": "hello@cloudcatch.io",
+            "homepage": "https://cloudcatch.io",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/cloudcatch/user-roles-table/issues",
+        "source": "https://github.com/cloudcatch/user-roles-table"
+    },
     "require-dev": {
         "phpunit/phpunit": "^9",
         "yoast/phpunit-polyfills": "^2.0",
