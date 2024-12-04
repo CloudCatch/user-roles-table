@@ -46,6 +46,7 @@
     "scripts": {
         "phpcs": "vendor/bin/phpcs",
         "phpcbf": "vendor/bin/phpcbf",
-        "test": "wp-env run tests-cli --env-cwd=wp-content/plugins/user-roles-table vendor/bin/phpunit"
+        "test": "wp-env run tests-cli --env-cwd=wp-content/plugins/user-roles-table vendor/bin/phpunit",
+        "plugin-zip": "bash bin/build-zip.sh"
     }
 }
