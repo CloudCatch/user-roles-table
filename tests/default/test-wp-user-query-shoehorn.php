@@ -6,7 +6,7 @@
  */
 
 /**
- * Sample test case.
+ * Shoehorn test case.
  */
 class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 
@@ -64,6 +64,12 @@ class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 		$u->add_role( 'role1' );
 		$u->add_role( 'role2' );
 
+		// Add random user meta to each user.
+		update_user_meta( self::$user_1_id, 'test_meta1', 'test1' );
+		update_user_meta( self::$user_2_id, 'test_meta1', 'test1' );
+		update_user_meta( self::$user_2_id, 'test_meta2', 'test2' );
+		update_user_meta( self::$user_3_id, 'test_meta3', 'test3' );
+
 		$generator = $user_roles_table_cli::do_migration();
 
 		foreach ( $generator as $result ) {
@@ -91,9 +97,7 @@ class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 	public function test_install() {
 		global $wpdb;
 
-		$table_name = $wpdb->prefix . 'user_roles';
-
-		$this->assertTrue( $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}user_roles'" ) === $table_name );
+		$this->assertEquals( 1, $wpdb->get_var( "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{$wpdb->dbname}' AND table_name = '{$wpdb->base_prefix}user_roles'" ) );
 	}
 
 	/**
@@ -102,11 +106,14 @@ class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 	public function test_migrated() {
 		global $wpdb;
 
-		$migration_completed = get_option( 'user_role_tables_migrated', '' );
+		$migration_completed = get_site_option( 'user_role_tables_migrated', '' );
 
 		$this->assertNotEmpty( $migration_completed );
 
-		$this->assertGreaterThan( 0, $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}user_roles" ) );
+		$this->assertGreaterThan( 0, $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->base_prefix}user_roles" ) );
+
+		// Test how many rows user ID 3 has.
+		$this->assertEquals( 3, $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->base_prefix}user_roles WHERE user_id = %d", self::$user_3_id ) ) );
 	}
 
 	/**
@@ -117,12 +124,19 @@ class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 
 		$user_roles = new \WP_User_Query( array( 'role' => 'role1' ) );
 
-		$user_query_without_roles = new \WP_User_Query( array( 'number' => 10 ) );
-
 		remove_all_filters( 'enable_roles_table_integration' );
 
 		$this->assertTrue( $user_roles->get( 'roles_table' ) );
-		$this->assertEmpty( $user_query_without_roles->get( 'roles_table' ) );
+	}
+
+	/**
+	 * Test that the request is different.
+	 */
+	public function test_requests_not_equal() {
+		$native = new \WP_User_Query( array( 'role' => 'role1', 'roles_table' => true ) );
+		$user_roles = new \WP_User_Query( array( 'role' => 'role1' ) );
+
+		$this->assertNotEquals( $native->request, $user_roles->request );
 	}
 
 	/**
@@ -328,5 +342,34 @@ class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 		$user_roles2 = new \WP_User_Query( array( 'fields' => 'display_name', 'role' => 'role1' ) );
 
 		$this->assertEquals( $native2->get_results(), $user_roles2->get_results() );
+	}
+
+	/**
+	 * Test SQL_CALC_FOUND_ROWS after the query.
+	 */
+	public function test_query_users_sql_calc_found_rows() {
+		$native = new \WP_User_Query( array( 'role' => 'role1', 'roles_table' => true ) );
+		$user_roles = new \WP_User_Query( array( 'role' => 'role1' ) );
+
+		$this->assertEquals( $native->get_total(), $user_roles->get_total() );
+	}
+
+	public function test_query_users_by_meta() {
+		$native = new \WP_User_Query( array( 'meta_key' => 'test_meta1', 'meta_value' => 'test1', 'roles_table' => true ) );
+		$user_roles = new \WP_User_Query( array( 'meta_key' => 'test_meta1', 'meta_value' => 'test1' ) );
+
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
+		$this->assertEquals( $native->get_total(), 2 );
+
+		$native = new \WP_User_Query( array( 'meta_query' => array( array( 'key' => 'test_meta1', 'value' => 'test1' ) ), 'roles_table' => true ) );
+		$user_roles = new \WP_User_Query( array( 'meta_query' => array( array( 'key' => 'test_meta1', 'value' => 'test1' ) ) ) );
+
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
+		$this->assertEquals( $native->get_total(), 2 );
+
+		$native = new \WP_User_Query( array( 'meta_query' => array( array( 'key' => 'test_meta1', 'compare' => 'NOT EXISTS' ) ), 'roles_table' => true ) );
+		$user_roles = new \WP_User_Query( array( 'meta_query' => array( array( 'key' => 'test_meta1', 'compare' => 'NOT EXISTS' ) ) ) );
+
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
 	}
 }

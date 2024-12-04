@@ -1,5 +1,10 @@
 {
+    "$schema": "https://raw.githubusercontent.com/WordPress/gutenberg/refs/heads/trunk/schemas/json/wp-env.json",
     "plugins": [
         "."
-    ]
+    ],
+    "config": {
+        "WP_DEBUG": true,
+        "WP_ALLOW_MULTISITE": true
+    }
 }
