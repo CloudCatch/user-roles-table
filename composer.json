@@ -46,6 +46,11 @@
     "scripts": {
         "phpcs": "vendor/bin/phpcs",
         "phpcbf": "vendor/bin/phpcbf",
-        "test": "wp-env run tests-cli --env-cwd=wp-content/plugins/user-roles-table vendor/bin/phpunit"
+        "phpunit": "wp-env run tests-cli --env-cwd=wp-content/plugins/user-roles-table vendor/bin/phpunit",
+        "phpunit-multisite": "wp-env run tests-cli --env-cwd=wp-content/plugins/user-roles-table vendor/bin/phpunit -c phpunit-multisite.xml.dist",
+        "test": [
+            "@phpunit",
+            "@phpunit-multisite"
+        ]
     }
 }

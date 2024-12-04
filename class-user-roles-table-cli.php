@@ -26,6 +26,9 @@ class User_Roles_Table_CLI {
 	 * wp user-roles-table install
 	 *
 	 * @when after_wp_load
+	 * 
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
 	 */
 	public function install( $args = array(), $assoc_args = array() ) {
 		if ( ( empty( $assoc_args['force'] ) || ! $assoc_args['force'] ) && version_compare( USER_ROLE_TABLES_VERSION, get_option( 'user_role_tables_version' ), '<=' ) ) {
@@ -52,9 +55,10 @@ class User_Roles_Table_CLI {
 
 		$charset_collate = $wpdb->get_charset_collate();
 
-		$sql = "CREATE TABLE {$wpdb->prefix}user_roles (
+		$sql = "CREATE TABLE {$wpdb->base_prefix}user_roles (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
 			user_id bigint(20) NOT NULL,
+			site_id bigint(20) NOT NULL DEFAULT '1',
 			role varchar(255) NOT NULL,
 			PRIMARY KEY  (id),
 			KEY user_id (user_id),
@@ -73,7 +77,7 @@ class User_Roles_Table_CLI {
 	 * 
 	 * ## OPTIONS
 	 * 
-	 * [--truncate]
+	 * [--preserve]
 	 * : Whether or not to truncate the custom user roles table before migrating user roles.
 	 * ---
 	 * default: false
@@ -118,68 +122,97 @@ class User_Roles_Table_CLI {
 	public static function do_migration( $args = array(), $assoc_args = array() ) {
 		global $wpdb;
 
-		$users = $wpdb->get_results(
-			"
-           SELECT 		SQL_CALC_FOUND_ROWS ID, meta_value
-           FROM 		$wpdb->users
-           LEFT JOIN 	$wpdb->usermeta
-               ON 		$wpdb->users.ID = $wpdb->usermeta.user_id
-           WHERE 		meta_key = '{$wpdb->prefix}capabilities'
-           ORDER BY 	ID ASC
-           "
-		);
-   
-		$users_count = $wpdb->get_var( 'SELECT FOUND_ROWS();' );
-   
-		yield array(
-			'type'  => 'start',
-			'count' => $users_count,
-		);
-   
-		if ( ! empty( $assoc_args['truncate'] ) && $assoc_args['truncate'] ) {
+		// Check if multisite is enabled and setup properly.
+		$multisite = is_multisite();
+
+		$site_ids = $multisite ? wp_list_pluck( get_sites(), 'blog_id' ) : array( 1 );
+
+		// Truncate the custom user roles table.
+		if ( empty( $assoc_args['preserve'] ) || ! $assoc_args['preserve'] ) {
 			yield array(
 				'type'    => 'message',
 				'message' => __( 'Truncating the custom user roles table...', 'user-roles-table' ),
 			);
-   
-			$wpdb->query( "TRUNCATE TABLE {$wpdb->prefix}user_roles" );
+
+			$wpdb->query( "TRUNCATE TABLE {$wpdb->base_prefix}user_roles" );
 		}
-   
-		foreach ( $users as $user ) {
-			$roles = (array) array_keys( maybe_unserialize( $user->meta_value ) );
-   
-			foreach ( $roles as $role ) {
-				$wpdb->insert(
-					"{$wpdb->prefix}user_roles",
-					array(
-						'user_id' => $user->ID,
-						'role'    => $role,
+
+		// Count for all sites.
+		$total_users_count = (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . $wpdb->users );
+
+		yield array(
+			'type'  => 'start',
+			'count' => $total_users_count,
+		);
+
+		yield array(
+			'type'    => 'message',
+			'message' => __( 'Migrating user roles...', 'user-roles-table' ),
+		);
+
+		foreach ( $site_ids as $site_id ) {
+			if ( $multisite ) {
+				switch_to_blog( $site_id );
+
+				yield array(
+					'type'    => 'message',
+					'message' => sprintf(
+						/* translators: %d: Site ID */
+						__( 'Migrating user roles for site %d...', 'user-roles-table' ),
+						$site_id
 					),
-					array(
-						'%d',
-						'%s',
-					)
 				);
 			}
-   
-			yield array(
-				'type'    => 'progress',
-				'user_id' => $user->ID,
-				'roles'   => $roles,
+
+			$users = $wpdb->get_results(
+				"
+			SELECT 		ID, meta_value
+			FROM 		$wpdb->users
+			LEFT JOIN 	$wpdb->usermeta
+				ON 		$wpdb->users.ID = $wpdb->usermeta.user_id
+			WHERE 		meta_key = '{$wpdb->prefix}capabilities'
+			ORDER BY 	ID ASC
+			"
 			);
+
+			foreach ( $users as $user ) {
+				$roles = (array) array_keys( maybe_unserialize( $user->meta_value ) );
+	
+				foreach ( $roles as $role ) {
+					$wpdb->insert(
+						"{$wpdb->base_prefix}user_roles",
+						array(
+							'user_id' => $user->ID,
+							'site_id' => $site_id,
+							'role'    => $role,
+						),
+						array(
+							'%d',
+							'%d',
+							'%s',
+						)
+					);
+				}
+
+				yield array(
+					'type'    => 'progress',
+					'user_id' => $user->ID,
+					'roles'   => $roles,
+				);
+			}
 		}
-   
+
 		yield array(
 			'type'    => 'finish',
 			'message' => sprintf(
 				/* translators: %1$d: Number of users, %2$s: User or users */
 				__( 'Migrated %1$d %2$s to the custom user roles table.', 'user-roles-table' ),
-				$users_count,
-				_n( 'user', 'users', $users_count, 'user-roles-table' ) 
+				$total_users_count,
+				_n( 'user', 'users', $total_users_count, 'user-roles-table' ) 
 			),
 		);
    
-		update_option( 'user_role_tables_migrated', time() );
+		update_site_option( 'user_role_tables_migrated', time() );
 	}
 }
 

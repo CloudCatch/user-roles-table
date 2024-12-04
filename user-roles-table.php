@@ -43,16 +43,16 @@ register_activation_hook( __FILE__, array( __NAMESPACE__ . '\User_Roles_Table_CL
  * @return void
  */
 function maybe_filter_users( $query ) {
-	if ( ! get_option( 'user_role_tables_migrated' ) ) {
+	if ( ! get_site_option( 'user_role_tables_migrated' ) ) {
 		return;
 	}
 
-	if ( true !== $query->get( 'roles_table' ) && ! apply_filters( 'enable_roles_table_integration', true, $query ) ) {
+	if ( true !== $query->get( 'roles_table' ) && ! apply_filters( 'enable_roles_table_integration', false, $query ) ) {
 		return;
 	}
 
 	// Bail early if we are not querying users by roles or capabilities.
-	if ( empty( $query->get( 'role' ) ) && empty( $query->get( 'role__in' ) ) && empty( $query->get( 'role__not_in' ) ) && empty( $query->get( 'capability' ) ) ) {
+	if ( ( empty( $query->get( 'role' ) ) && empty( $query->get( 'role__in' ) ) && empty( $query->get( 'role__not_in' ) ) && empty( $query->get( 'capability' ) ) && ! is_multisite() ) ) {
 		return;
 	}
 
@@ -65,25 +65,33 @@ add_action( 'pre_get_users', __NAMESPACE__ . '\maybe_filter_users', 1000 );
 /**
  * Update user roles in the custom table when user meta is updated.
  *
- * @param null|bool $check Whether to allow updating metadata for the given type.
- * @param int       $object_id ID of the object metadata is for.
- * @param string    $meta_key Metadata key.
- * @param mixed     $meta_value Metadata value. Must be serializable if non-scalar.
- * @return null|bool
+ * @param int    $meta_id   ID of the metadata entry to update.
+ * @param int    $object_id ID of the object metadata is for.
+ * @param string $meta_key Metadata key.
+ * @param mixed  $meta_value Metadata value. Must be serializable if non-scalar.
+ * @return void
  */
-function update_user_roles( $check, $object_id, $meta_key, $meta_value ) {
+function update_user_roles( $meta_id, $object_id, $meta_key, $meta_value ) {
 	global $wpdb;
 
-	if ( $wpdb->base_prefix . 'capabilities' !== $meta_key ) {
-		return $check;
+	if ( $wpdb->prefix . 'capabilities' !== $meta_key ) {
+		return;
+	}
+
+	$blog_id = 1;
+
+	if ( is_multisite() ) {
+		$blog_id = get_current_blog_id();
 	}
 
 	$wpdb->delete(
-		$wpdb->prefix . 'user_roles',
+		$wpdb->base_prefix . 'user_roles',
 		array(
 			'user_id' => $object_id,
+			'site_id' => $blog_id,
 		),
 		array(
+			'%d',
 			'%d',
 		)
 	);
@@ -92,18 +100,54 @@ function update_user_roles( $check, $object_id, $meta_key, $meta_value ) {
 
 	foreach ( $roles as $role ) {
 		$wpdb->insert(
-			$wpdb->prefix . 'user_roles',
+			$wpdb->base_prefix . 'user_roles',
 			array(
 				'user_id' => $object_id,
+				'site_id' => $blog_id,
 				'role'    => $role,
 			),
 			array(
+				'%d',
 				'%d',
 				'%s',
 			)
 		);
 	}
-
-	return $check;
 }
-add_filter( 'update_user_metadata', __NAMESPACE__ . '\update_user_roles', PHP_INT_MAX, 5 );
+add_action( 'updated_user_meta', __NAMESPACE__ . '\update_user_roles', PHP_INT_MAX, 4 );
+add_action( 'added_user_meta', __NAMESPACE__ . '\update_user_roles', PHP_INT_MAX, 4 );
+
+/**
+ * Delete user roles from the custom table when user meta is deleted.
+ *
+ * @param string[] $meta_ids    An array of metadata entry IDs to delete.
+ * @param int      $object_id   ID of the object metadata is for.
+ * @param string   $meta_key    Metadata key.
+ * @return void
+ */
+function delete_user_roles( $meta_ids, $object_id, $meta_key ) {
+	global $wpdb;
+
+	if ( $wpdb->prefix . 'capabilities' !== $meta_key ) {
+		return;
+	}
+
+	$blog_id = 1;
+
+	if ( is_multisite() ) {
+		$blog_id = get_current_blog_id();
+	}
+
+	$wpdb->delete(
+		$wpdb->base_prefix . 'user_roles',
+		array(
+			'user_id' => $object_id,
+			'site_id' => $blog_id,
+		),
+		array(
+			'%d',
+			'%d',
+		)
+	);
+}
+add_action( 'delete_user_meta', __NAMESPACE__ . '\delete_user_roles', PHP_INT_MAX, 3 );

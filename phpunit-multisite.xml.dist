@@ -1,11 +1,12 @@
 <?xml version="1.0"?>
 <phpunit bootstrap="tests/bootstrap.php" backupGlobals="false" colors="true" convertErrorsToExceptions="true" convertNoticesToExceptions="true" convertWarningsToExceptions="true">
 	<testsuites>
-		<testsuite name="testing">
-			<directory prefix="test-" suffix=".php">./tests/default/</directory>
+		<testsuite name="testing-multisite">
+			<directory prefix="test-" suffix=".php">./tests/multisite/</directory>
 		</testsuite>
 	</testsuites>
 	<php>
+		<const name="WP_TESTS_MULTISITE" value="1"/>
 		<ini name="error_reporting" value="24575"/>
 	</php>
 </phpunit>
