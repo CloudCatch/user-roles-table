@@ -4,7 +4,7 @@
  * Description:       Move WordPress user roles to a custom table.
  * Requires at least: 6.0.2
  * Requires PHP:      7.0
- * Version:           1.0.0
+ * Version:           1.1.0
  * Author:            CloudCatch LLC
  * Author URI:        https://cloudcatch.io
  * License:           GPL v2 or later
@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Define the version of the custom table schema.
  */
-define( 'USER_ROLE_TABLES_VERSION', '1.0.0' );
+define( 'USER_ROLE_TABLES_VERSION', '1.1.0' );
 
 /**
  * Include necessary files.
