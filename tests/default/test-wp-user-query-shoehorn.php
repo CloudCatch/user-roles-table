@@ -372,4 +372,100 @@ class WP_User_Query_Shoehorn_Test extends WP_UnitTestCase {
 
 		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
 	}
+
+	public function test_query_users_search() {
+		global $wpdb;
+		
+		$native = new \WP_User_Query( array( 'search' => 'test1', 'roles_table' => true ) );
+		$user_roles = new \WP_User_Query( array( 'search' => 'test1' ) );
+
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
+
+		// Update name of user 1
+		$updated = wp_update_user( array( 
+			'ID' => self::$user_1_id, 
+			'first_name' => 'John', 
+			'last_name' => 'Doe', 
+			'display_name' => 'John Doe',
+			'user_nicename' => 'john-doe',
+			'user_login' => 'john-doe',
+			'user_email' => 'johndoe@example.com',
+		) );
+
+		$this->assertEquals( $updated, self::$user_1_id );
+
+		$native = new \WP_User_Query( array( 
+			'role__in'       => array(
+				'role1',
+			),
+			'fields'         => array( 'ID', 'display_name' ),
+			'search'         => '*John*',
+			'search_columns' => array(
+				'ID',
+				'user_login',
+				'user_nicename',
+				'user_email',
+				'display_name',
+			),
+			'roles_table' => true 
+		) );
+
+		$user_roles = new \WP_User_Query( array( 
+			'role__in'       => array(
+				'role1',
+			),
+			'fields'         => array( 'ID', 'display_name' ),
+			'search'         => '*John*',
+			'search_columns' => array(
+				'ID',
+				'user_login',
+				'user_nicename',
+				'user_email',
+				'display_name',
+			),
+		) );
+
+		$this->assertCount( 1, $native->get_results() );
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
+		$this->assertStringNotContainsString( $wpdb->users . '.user_login', $user_roles->request );
+		$this->assertStringContainsString( $wpdb->users . '.user_login', $native->request );
+
+		$native = new \WP_User_Query( array( 
+			'role__in'       => array(
+				'role1',
+			),
+			'search'         => '*John*',
+			'roles_table' => true 
+		) );
+
+		$user_roles = new \WP_User_Query( array( 
+			'role__in'       => array(
+				'role1',
+			),
+			'search'         => '*John*',
+		) );
+
+		$this->assertCount( 1, $native->get_results() );
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
+
+		$native = new \WP_User_Query( array( 
+			'role__in'       => array(
+				'role1',
+			),
+			'search'         => 'johndoe@example.com',
+			'roles_table' => true 
+		) );
+
+		$user_roles = new \WP_User_Query( array( 
+			'role__in'       => array(
+				'role1',
+			),
+			'search'         => 'johndoe@example.com',
+		) );
+
+		$this->assertCount( 1, $native->get_results() );
+		$this->assertEquals( $native->get_results(), $user_roles->get_results() );
+		$this->assertStringNotContainsString( $wpdb->users . '.user_email', $user_roles->request );
+		$this->assertStringContainsString( $wpdb->users . '.user_email', $native->request );
+	}
 }

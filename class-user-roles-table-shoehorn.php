@@ -96,7 +96,7 @@ class User_Roles_Table_Shoehorn {
 		$query->set( 'user_role_tables_hash', $this->hash );
 
 		add_filter( 'get_meta_sql', array( $this, 'filter_user_meta_query' ), 1000, 6 );
-
+		add_filter( 'user_search_columns', array( $this, 'filter_user_search_columns' ), 1000, 3 );
 		add_action( 'pre_user_query', array( $this, 'filter_user_query' ), 1000 );
 	}
 
@@ -280,6 +280,33 @@ class User_Roles_Table_Shoehorn {
 		}
 
 		return $sql;
+	}
+
+	/**
+	 * Filter user search columns to prefix them with the users table to prevent ambiguous column errors.
+	 *
+	 * @param string[]      $search_columns Search columns.
+	 * @param string        $search         Search string.
+	 * @param WP_User_Query $query          Query object.
+	 * @return string[]
+	 */
+	public function filter_user_search_columns( $search_columns, $search, $query ) {
+		if ( ! $query instanceof WP_User_Query || $query->get( 'user_role_tables_hash' ) !== $this->hash ) {
+			return $search_columns;
+		}
+
+		remove_filter( 'user_search_columns', array( $this, 'filter_user_search_columns' ), 1000 );
+
+		array_walk(
+			$search_columns,
+			function ( &$column ) {
+				global $wpdb;
+
+				$column = $wpdb->users . '.' . $column;
+			} 
+		);
+
+		return $search_columns;
 	}
 
 	/**
