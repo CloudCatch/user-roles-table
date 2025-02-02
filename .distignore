@@ -1,0 +1,16 @@
+/.vscode
+/bin
+/dist
+/tests
+/vendor
+/.distignore
+/.gitattributes
+/.gitignore
+/.phpunit.result.cache
+/.wp-env.json
+composer.json
+composer.lock
+LICENSE
+phpcs.xml
+phpunit-multisite.xml.dist
+phpunit.xml.dist

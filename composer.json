@@ -51,6 +51,7 @@
         "test": [
             "@phpunit",
             "@phpunit-multisite"
-        ]
+        ],
+        "zip": "./bin/plugin-zip.sh"
     }
 }
